@@ -1,0 +1,49 @@
+[package]
+name = "rbar"
+version = "0.1.0"
+edition = "2021"
+authors = ["Vitalii Lukyanov <tukanoid@outlook.com>"]
+
+[dependencies]
+clap = { version = "4.5.15", features = ["derive"] }
+
+iced = { version = "0.13", features = [
+  "fira-sans",
+  "system",
+  "lazy",
+  "tokio",
+  "highlighter",
+  "advanced",
+] }
+iced_layershell = { version = "0.7", git = "https://github.com/waycrate/exwlshelleventloop.git" }
+iced_layershell_macros = { version = "0.7", git = "https://github.com/waycrate/exwlshelleventloop.git", features = [
+  "diagnostics",
+] }
+# iced_layershell = { version = "0.7", path = "../exwlshelleventloop/iced_layershell" }
+iced_renderer = "0.13"
+
+tokio = { version = "1.39.2", features = ["rt-multi-thread", "time"] }
+
+directories = "5.0.1"
+blight = "0.7.1"
+icu_calendar = "1.5.2"
+pipewire = "0.8.0"
+starship-battery = "0.8.3"
+system-tray = "0.2.0"
+sysinfo = "0.30.13"
+chrono = "0.4.38"
+zbus = "4.4.0"
+
+serde = { version = "1.0.206", features = ["derive"] }
+ron = "0.8.1"
+
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
+
+smart-default = "0.7.1"
+derive_more = { version = "1.0.0", features = ["display", "from"] }
+itertools = "0.13.0"
+
+miette = { version = "7.2.0", features = ["fancy", "syntect-highlighter"] }
+paste = "1.0.15"
+bon = "2.3.0"
