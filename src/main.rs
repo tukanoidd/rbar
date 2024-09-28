@@ -39,15 +39,15 @@ fn main() -> miette::Result<()> {
 }
 
 fn init_logging(debug: bool, trace: bool) {
-    use tracing::Level;
-
     let level = trace
-        .then_some(Level::TRACE)
-        .or_else(|| (debug || cfg!(debug_assertions)).then_some(Level::DEBUG))
-        .unwrap_or(Level::INFO);
+        .then_some("trace")
+        .or_else(|| (debug || cfg!(debug_assertions)).then_some("debug"))
+        .unwrap_or("info");
 
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().pretty())
-        .with(tracing::level_filters::LevelFilter::from_level(level))
+        .with(tracing_subscriber::filter::EnvFilter::new(format!(
+            "rbar={level}"
+        )))
         .init();
 }

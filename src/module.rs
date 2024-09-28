@@ -10,6 +10,7 @@ use iced::{
     widget::{row, Space},
     Element, Length, Renderer, Theme,
 };
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::app::AppMsg;
@@ -29,6 +30,9 @@ impl<C> TModuleConfig for C where C: Default + Hash + Serialize + for<'de> Deser
 
 #[derive(Default, Display, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct NoConfig;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct NoEvent;
 
 #[derive(Builder)]
 pub struct ModuleInfo<M>
@@ -63,19 +67,41 @@ where
     }
 }
 
-pub struct Modules(Vec<Module>);
+pub struct Modules {
+    modules: Vec<Module>,
+    position: ModulePosition,
+}
 
 impl Modules {
+    pub fn left(mut self) -> Self {
+        self.position = ModulePosition::Left;
+        self
+    }
+
+    pub fn right(mut self) -> Self {
+        self.position = ModulePosition::Right;
+        self
+    }
+
     pub fn view(&self) -> Element<'_, AppMsg, Theme, Renderer> {
-        row(self.0.iter().map(Module::view))
+        let mut children = self.modules.iter().map(Module::view).collect_vec();
+
+        match self.position {
+            ModulePosition::Left => children.push(Space::with_width(Length::Fill).into()),
+            ModulePosition::Right => children.insert(0, Space::with_width(Length::Fill).into()),
+            _ => {}
+        }
+
+        row(children)
             .spacing(10)
             .align_y(Vertical::Center)
             .height(Length::Fill)
+            .width(Length::Shrink)
             .into()
     }
 
     pub fn update(&mut self) -> impl Iterator<Item = AppMsg> + '_ {
-        self.0.iter_mut().filter_map(|m| m.update())
+        self.modules.iter_mut().filter_map(|m| m.update())
     }
 }
 
@@ -84,8 +110,17 @@ where
     I: IntoIterator<Item = ModuleConfig>,
 {
     fn from(value: I) -> Self {
-        Self(value.into_iter().map(From::from).collect())
+        Self {
+            modules: value.into_iter().map(From::from).collect(),
+            position: ModulePosition::Center,
+        }
     }
+}
+
+pub enum ModulePosition {
+    Left,
+    Center,
+    Right,
 }
 
 pub struct ModuleGroups {
@@ -124,9 +159,9 @@ where
 {
     fn from((left, center, right): (M1, M2, M3)) -> Self {
         Self {
-            left: left.into(),
+            left: left.into().left(),
             center: center.into(),
-            right: right.into(),
+            right: right.into().right(),
         }
     }
 }
@@ -188,14 +223,14 @@ macro_rules! modules {
             $(
                 impl ModuleGetSet<$name> for Modules {
                     fn get(&self) -> impl Iterator<Item = &ModuleInfo<$name>> {
-                        self.0.iter().filter_map(|m| match m {
+                        self.modules.iter().filter_map(|m| match m {
                             Module::$name(m) => Some(m),
                             _ => None
                         })
                     }
 
                     fn get_mut(&mut self) -> impl Iterator<Item = &mut ModuleInfo<$name>> {
-                        self.0.iter_mut().filter_map(|m| match m {
+                        self.modules.iter_mut().filter_map(|m| match m {
                             Module::$name(m) => Some(m),
                             _ => None
                         })
