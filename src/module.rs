@@ -6,8 +6,7 @@ use std::hash::Hash;
 use bon::Builder;
 use derive_more::derive::{Display, From};
 use iced::{
-    alignment::Vertical,
-    widget::{row, Space},
+    widget::{container, row, Space},
     Element, Length, Renderer, Theme,
 };
 use itertools::Itertools;
@@ -15,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::app::AppMsg;
 
-pub trait TModule {
+pub trait TModule: std::fmt::Debug {
     type Config: TModuleConfig;
     type Event: Clone;
 
@@ -34,7 +33,7 @@ pub struct NoConfig;
 #[derive(Debug, Clone, PartialEq)]
 pub struct NoEvent;
 
-#[derive(Builder)]
+#[derive(Debug, Builder)]
 pub struct ModuleInfo<M>
 where
     M: TModule,
@@ -92,11 +91,10 @@ impl Modules {
             _ => {}
         }
 
-        row(children)
-            .spacing(10)
-            .align_y(Vertical::Center)
-            .height(Length::Fill)
-            .width(Length::Shrink)
+        container(row(children).spacing(10).width(Length::Shrink))
+            .center_y(Length::Fill)
+            .padding(5)
+            .style(container::rounded_box)
             .into()
     }
 
@@ -131,15 +129,15 @@ pub struct ModuleGroups {
 
 impl ModuleGroups {
     pub fn view(&self) -> Element<'_, AppMsg, Theme, Renderer> {
-        row![
+        container(row![
             self.left.view(),
             Space::with_width(Length::Fill),
             self.center.view(),
             Space::with_width(Length::Fill),
             self.right.view()
-        ]
-        .align_y(Vertical::Center)
-        .height(Length::Fill)
+        ])
+        .center_y(Length::Fill)
+        .padding(5)
         .into()
     }
 
@@ -183,7 +181,7 @@ macro_rules! modules {
         paste::paste! {
             $(use [< $name:snake:lower >]::{$name, [< $name Event >]};)+
 
-            #[derive(From)]
+            #[derive(Debug, From)]
             pub enum Module {
                 $($name(ModuleInfo<$name>)),+
             }

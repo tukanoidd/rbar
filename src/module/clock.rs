@@ -11,7 +11,7 @@ use crate::app::AppMsg;
 
 use super::TModule;
 
-#[derive(SmartDefault)]
+#[derive(Debug, SmartDefault)]
 pub struct Clock {
     #[default(Local::now())]
     pub time: DateTime<Local>,

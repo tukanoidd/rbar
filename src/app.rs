@@ -23,7 +23,7 @@ struct App {
 }
 
 impl App {
-    async fn init_app() -> miette::Result<AppInit> {
+    async fn init() -> miette::Result<AppInit> {
         let battery_info = BatteryInfo::init()?;
 
         Ok(AppInit {
@@ -44,7 +44,12 @@ impl Application for App {
 
             battery_info: None,
         };
-        let command = Task::batch([Task::perform(async {}, |_| AppMsg::UpdateTime)]);
+        let command = Task::batch([
+            Task::perform(async {}, |_| AppMsg::UpdateTime),
+            Task::perform(Self::init(), |res| {
+                AppMsg::Init(res.map_err(|e| e.to_string()))
+            }),
+        ]);
 
         (res, command)
     }
@@ -55,15 +60,9 @@ impl Application for App {
 
     fn update(&mut self, message: Self::Message) -> Task<Self::Message> {
         let msgs = match message {
-            AppMsg::Init => {
-                return Task::perform(Self::init_app(), |r| {
-                    AppMsg::InitRes(r.map_err(|e| e.to_string()))
-                })
-            }
-            AppMsg::InitRes(res) => match res {
+            AppMsg::Init(res) => match res {
                 Ok(AppInit { battery_info }) => {
-                    self.battery_info = Some(battery_info);
-                    vec![]
+                    vec![AppMsg::RefreshBattery(Ok(battery_info))]
                 }
                 Err(err) => {
                     panic!("Failed to initialize the app: {err}");
@@ -119,17 +118,15 @@ impl Application for App {
                             battery.module.set(data.clone());
                         });
                     }
-
-                    return Task::perform(
-                        async {
-                            sleep(Duration::from_millis(1000)).await;
-                            BatteryInfo::init().map(Arc::new).map_err(|e| e.to_string())
-                        },
-                        AppMsg::RefreshBattery,
-                    );
                 }
 
-                vec![]
+                return Task::perform(
+                    async {
+                        sleep(Duration::from_millis(1000)).await;
+                        BatteryInfo::init().map(Arc::new).map_err(|e| e.to_string())
+                    },
+                    AppMsg::RefreshBattery,
+                );
             }
             AppMsg::Module(ev) => {
                 self.module_groups.set_event(ev);
@@ -172,8 +169,7 @@ impl PartialEq for AppInit {
 #[to_layer_message]
 #[derive(Debug, Clone, PartialEq)]
 pub enum AppMsg {
-    Init,
-    InitRes(Result<AppInit, String>),
+    Init(Result<AppInit, String>),
 
     UpdateTime,
 

@@ -1,4 +1,4 @@
-use iced::widget::{container, rich_text, row, span};
+use iced::widget::{rich_text, row, span};
 use iced_fonts::{nerd, Nerd};
 use miette::IntoDiagnostic;
 use starship_battery::{Battery as SBattery, Manager, State};
@@ -9,6 +9,7 @@ use super::{NoConfig, NoEvent, TModule};
 
 pub type BatteryEvent = NoEvent;
 
+#[derive(Debug)]
 pub struct Battery(Vec<BatteryData>);
 
 impl Battery {
@@ -34,13 +35,14 @@ impl TModule for Battery {
     }
 
     fn view(&self) -> iced::Element<'_, Self::Event, iced::Theme, iced::Renderer> {
-        container(
-            row(self.0.iter().map(|BatteryData { level, icon }| {
-                rich_text![span(nerd::icon_to_string(*icon)), span(format!("{level}%"))].into()
-            }))
-            .spacing(5),
-        )
-        .style(container::rounded_box)
+        row(self.0.iter().map(|BatteryData { level, icon }| {
+            rich_text![
+                span(nerd::icon_to_string(*icon)).font(iced_fonts::NERD_FONT),
+                span(format!(" {level}%"))
+            ]
+            .into()
+        }))
+        .spacing(5)
         .into()
     }
 }
@@ -107,7 +109,7 @@ impl PartialEq for BatteryInfo {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct BatteryData {
     level: u8,
     icon: Nerd,
