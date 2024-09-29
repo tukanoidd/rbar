@@ -32,6 +32,8 @@ impl TModule for Audio {
 
                 self.default = info.default_device_index();
                 self.data = info.devices.iter().map(AudioData::new).collect();
+
+                tracing::debug!("{self:#?}");
             }
         }
 
@@ -174,10 +176,6 @@ impl AudioInfo {
             .map(AudioDevice::new)
             .collect::<miette::Result<Vec<_>>>()?;
 
-        for info in &devices {
-            tracing::debug!("{:#?}", info);
-        }
-
         Ok(Self {
             sock,
             server_info,
@@ -236,7 +234,9 @@ impl AudioDevice {
         .unwrap_or_else(|| "Unknown".into());
 
         let muted = sink.muted;
-        let volume = (sink.base_volume.to_db() * 100.0).round() as u8;
+        let volume = (sink.base_volume.to_linear() * 100.0).round() as u8;
+
+        tracing::debug!("{name} ({description}) [{muted} {volume}]");
 
         Ok(Self {
             sink,
