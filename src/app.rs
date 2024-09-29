@@ -147,8 +147,7 @@ impl Application for App {
             AppMsg::InitAudio(info) => {
                 self.audio_info = Some(info.clone());
                 self.module_groups.set_event(AudioEvent::SetData(info));
-
-                vec![]
+                self.module_groups.update().collect()
             }
 
             AppMsg::WaitAndMsg(duration, msg) => {
