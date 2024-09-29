@@ -1,6 +1,9 @@
+#![feature(box_into_inner)]
+
 mod app;
 mod config;
 mod module;
+mod util;
 
 use std::path::PathBuf;
 

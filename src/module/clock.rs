@@ -32,6 +32,10 @@ impl TModule for Clock {
     fn update(&mut self, event: Self::Event) -> Option<AppMsg> {
         match event {
             ClockEvent::SwitchFormat => self.format.switch(),
+            ClockEvent::SetTime(time) => {
+                self.time = time;
+                return Some(AppMsg::wait_ms_msg(300, AppMsg::UpdateTime));
+            }
         }
 
         None
@@ -49,6 +53,7 @@ impl TModule for Clock {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ClockEvent {
     SwitchFormat,
+    SetTime(DateTime<Local>),
 }
 
 #[allow(non_camel_case_types)]

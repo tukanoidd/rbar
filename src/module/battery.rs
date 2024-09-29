@@ -5,18 +5,10 @@ use starship_battery::{Battery as SBattery, Manager, State};
 
 use crate::app::AppMsg;
 
-use super::{NoConfig, NoEvent, TModule};
-
-pub type BatteryEvent = NoEvent;
+use super::{NoConfig, TModule};
 
 #[derive(Debug)]
 pub struct Battery(Vec<BatteryData>);
-
-impl Battery {
-    pub fn set(&mut self, data: Vec<BatteryData>) {
-        self.0 = data;
-    }
-}
 
 impl TModule for Battery {
     type Config = NoConfig;
@@ -26,10 +18,10 @@ impl TModule for Battery {
         Self(vec![])
     }
 
-    fn update(&mut self, _event: Self::Event) -> Option<AppMsg> {
-        // match event {
-        //     _ => {}
-        // }
+    fn update(&mut self, event: Self::Event) -> Option<AppMsg> {
+        match event {
+            BatteryEvent::SetData(data) => self.0 = data,
+        }
 
         None
     }
@@ -45,6 +37,11 @@ impl TModule for Battery {
         .spacing(5)
         .into()
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BatteryEvent {
+    SetData(Vec<BatteryData>),
 }
 
 #[derive(Debug)]
@@ -113,4 +110,44 @@ impl PartialEq for BatteryInfo {
 pub struct BatteryData {
     level: u8,
     icon: Nerd,
+}
+
+macro_rules! battery_icons_eq {
+    ($icon:expr, $other_icon:expr => $($name:ident),+) => {
+        paste::paste! {
+            match ($icon, $other_icon) {
+                (Nerd::Battery, Nerd::Battery)
+                | (Nerd::BatteryCharging, Nerd::BatteryCharging)
+                $(
+                    | (Nerd::[< Battery $name >], Nerd::[< Battery $name >])
+                    | (
+                        Nerd::[< BatteryCharging $name >],
+                        Nerd::[< BatteryCharging $name >]
+                    ) => true,
+                 )+
+                _ => false
+            }
+
+        }
+    }
+}
+
+impl PartialEq for BatteryData {
+    fn eq(&self, other: &Self) -> bool {
+        let Self { level, icon } = self;
+        let Self {
+            level: other_level,
+            icon: other_icon,
+        } = other;
+
+        (level == other_level)
+            && (battery_icons_eq!(
+            icon,
+            other_icon =>
+                Outline,
+                Onezero, Twozero, Threezero,
+                Fourzero, Fivezero, Sixzero,
+                Sevenzero, Eightzero, Ninezero
+            ))
+    }
 }

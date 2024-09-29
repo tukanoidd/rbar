@@ -1,3 +1,4 @@
+pub mod audio;
 pub mod battery;
 pub mod clock;
 
@@ -171,7 +172,12 @@ where
     fn get(&self) -> impl Iterator<Item = &ModuleInfo<M>>;
     fn get_mut(&mut self) -> impl Iterator<Item = &mut ModuleInfo<M>>;
 
-    fn set_event(&mut self, event: M::Event) {
+    fn has(&self) -> bool {
+        self.get().count() > 0
+    }
+
+    fn set_event(&mut self, event: impl Into<M::Event>) {
+        let event = event.into();
         self.get_mut().for_each(|m| m.event = Some(event.clone()))
     }
 }
@@ -251,8 +257,8 @@ macro_rules! modules {
             )+
 
             impl ModuleGroups {
-                pub fn set_event(&mut self, event: ModuleEvent) {
-                    match event {
+                pub fn set_event(&mut self, event: impl Into<ModuleEvent>) {
+                    match event.into() {
                         $(ModuleEvent::$name(e) => ModuleGetSet::<$name>::set_event(self, e)),+
                     }
                 }
@@ -261,4 +267,4 @@ macro_rules! modules {
     }
 }
 
-modules![Clock, Battery];
+modules![Clock, Battery, Audio];

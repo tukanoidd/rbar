@@ -25,12 +25,7 @@
               nativeBuildInputs = with pkgs; [
                 pkg-config
                 libxkbcommon
-                pipewire.dev
-                libclang.lib
               ];
-            };
-            env = {
-              LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
             };
           };
         };

@@ -23,12 +23,11 @@ iced_layershell_macros = { version = "0.7", git = "https://github.com/waycrate/e
 iced_renderer = "0.13"
 iced_fonts = { version = "0.1.1", features = ["full"] }
 
-tokio = { version = "1.39.2", features = ["rt-multi-thread", "time"] }
+tokio = { version = "1.39.2", features = ["fs", "io-util", "net", "rt-multi-thread", "time"] }
 
 directories = "5.0.1"
 blight = "0.7.1"
 icu_calendar = "1.5.2"
-pipewire = "0.8.0"
 starship-battery = "0.8.3"
 system-tray = "0.2.0"
 sysinfo = "0.30.13"
@@ -48,3 +47,4 @@ itertools = "0.13.0"
 miette = { version = "7.2.0", features = ["fancy", "syntect-highlighter"] }
 paste = "1.0.15"
 bon = "2.3.0"
+pulseaudio = "0.2.1"
