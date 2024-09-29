@@ -48,3 +48,4 @@ miette = { version = "7.2.0", features = ["fancy", "syntect-highlighter"] }
 paste = "1.0.15"
 bon = "2.3.0"
 pulseaudio = "0.2.1"
+iced_aw = "0.11.0"

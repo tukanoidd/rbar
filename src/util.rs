@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 pub trait ResultExt<T, E> {
+    fn tokio_mutex(self) -> Result<tokio::sync::Mutex<T>, E>;
     fn arc(self) -> Result<Arc<T>, E>;
     fn some(self) -> Result<Option<T>, E>;
     fn err_str(self) -> Result<T, String>
@@ -9,6 +10,9 @@ pub trait ResultExt<T, E> {
 }
 
 impl<T, E> ResultExt<T, E> for Result<T, E> {
+    fn tokio_mutex(self) -> Result<tokio::sync::Mutex<T>, E> {
+        self.map(tokio::sync::Mutex::new)
+    }
     fn arc(self) -> Result<Arc<T>, E> {
         self.map(Arc::new)
     }

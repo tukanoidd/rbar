@@ -1,44 +1,95 @@
-use std::{ffi::CString, io::BufReader, os::unix::net::UnixStream};
+use std::{ffi::CString, io::BufReader, os::unix::net::UnixStream, sync::Arc};
 
-use iced::widget::text;
+use iced::widget::{rich_text, span};
+use iced_fonts::Nerd;
 use miette::IntoDiagnostic;
 use pulseaudio::protocol;
+use tokio::sync::Mutex;
 
 use super::{NoConfig, TModule};
 
 #[derive(Debug)]
-pub struct Audio {}
-
-impl Audio {}
+pub struct Audio {
+    default: Option<usize>,
+    data: Vec<AudioData>,
+}
 
 impl TModule for Audio {
     type Config = NoConfig;
     type Event = AudioEvent;
 
-    fn new(config: Self::Config) -> Self {
-        Self {}
+    fn new(_config: Self::Config) -> Self {
+        Self {
+            default: None,
+            data: vec![],
+        }
     }
 
     fn update(&mut self, event: Self::Event) -> Option<crate::app::AppMsg> {
         match event {
-            _ => {}
+            AudioEvent::SetData(info) => {
+                let info = info.blocking_lock();
+
+                self.default = info.default_device_index();
+                self.data = info.devices.iter().map(AudioData::new).collect();
+            }
         }
 
         None
     }
 
     fn view(&self) -> iced::Element<'_, Self::Event, iced::Theme, iced::Renderer> {
-        text("Audio").into()
+        let default_device = match self.default.and_then(|i| self.data.get(i)) {
+            Some(data) => data,
+            None => &AudioData::unknown(),
+        };
+
+        rich_text![
+            span(iced_fonts::nerd::icon_to_string(default_device.icon)).font(iced_fonts::NERD_FONT),
+            span(format!(" {}%", default_device.volume))
+        ]
+        .into()
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum AudioEvent {}
+#[derive(Debug, Clone)]
+pub enum AudioEvent {
+    SetData(Arc<Mutex<AudioInfo>>),
+}
+
+impl PartialEq for AudioEvent {
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
+}
+
+#[derive(Debug)]
+pub struct AudioData {
+    icon: Nerd,
+    volume: u8,
+}
+
+impl AudioData {
+    fn new(device_info: &AudioDevice) -> Self {
+        Self {
+            icon: device_info.icon(),
+            volume: device_info.volume,
+        }
+    }
+
+    fn unknown() -> Self {
+        Self {
+            icon: Nerd::VolumeOff,
+            volume: 0,
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct AudioInfo {
     sock: BufReader<UnixStream>,
-    sinks: Vec<protocol::SinkInfo>,
+    server_info: AudioServerInfo,
+    devices: Vec<AudioDevice>,
 }
 
 impl AudioInfo {
@@ -91,10 +142,24 @@ impl AudioInfo {
         )
         .into_diagnostic()?;
 
-        // Finally, write a command to get the list of sinks. The reply contains the information we're after.
         protocol::write_command_message(
             sock.get_mut(),
             2,
+            protocol::Command::GetServerInfo,
+            protocol_version,
+        )
+        .into_diagnostic()?;
+
+        let (_, server_info) = protocol::read_reply_message::<protocol::command::ServerInfo>(
+            &mut sock,
+            protocol_version,
+        )
+        .into_diagnostic()?;
+        let server_info = AudioServerInfo::new(server_info)?;
+
+        protocol::write_command_message(
+            sock.get_mut(),
+            3,
             protocol::Command::GetSinkInfoList,
             protocol_version,
         )
@@ -104,10 +169,96 @@ impl AudioInfo {
             protocol::read_reply_message::<protocol::SinkInfoList>(&mut sock, protocol_version)
                 .into_diagnostic()?;
 
-        for info in &sinks {
+        let devices = sinks
+            .into_iter()
+            .map(AudioDevice::new)
+            .collect::<miette::Result<Vec<_>>>()?;
+
+        for info in &devices {
             tracing::debug!("{:#?}", info);
         }
 
-        Ok(Self { sock, sinks })
+        Ok(Self {
+            sock,
+            server_info,
+            devices,
+        })
+    }
+
+    fn default_device_index(&self) -> Option<usize> {
+        self.devices
+            .iter()
+            .position(|d| d.name == self.server_info.default_device)
+    }
+}
+
+#[derive(Debug)]
+pub struct AudioServerInfo {
+    server: protocol::ServerInfo,
+    default_device: String,
+}
+
+impl AudioServerInfo {
+    fn new(server: protocol::ServerInfo) -> miette::Result<Self> {
+        let default_device = server
+            .default_sink_name
+            .as_ref()
+            .ok_or_else(|| miette::miette!("Failed to get default audio device"))?
+            .to_str()
+            .into_diagnostic()?
+            .to_string();
+
+        Ok(Self {
+            server,
+            default_device,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct AudioDevice {
+    sink: protocol::SinkInfo,
+
+    name: String,
+    description: String,
+
+    muted: bool,
+    volume: u8,
+}
+
+impl AudioDevice {
+    fn new(sink: protocol::SinkInfo) -> miette::Result<Self> {
+        let name = sink.name.to_str().into_diagnostic()?.to_string();
+        let description = match &sink.description {
+            Some(str) => Some(str.to_str().into_diagnostic()?.to_string()),
+            None => None,
+        }
+        .unwrap_or_else(|| "Unknown".into());
+
+        let muted = sink.muted;
+        let volume = (sink.base_volume.to_db() * 100.0).round() as u8;
+
+        Ok(Self {
+            sink,
+
+            name,
+            description,
+
+            muted,
+            volume,
+        })
+    }
+
+    fn icon(&self) -> Nerd {
+        if self.muted {
+            return Nerd::VolumeMute;
+        }
+
+        match self.volume {
+            0 => Nerd::VolumeOff,
+            1..=33 => Nerd::VolumeLow,
+            34..=66 => Nerd::VolumeMedium,
+            _ => Nerd::VolumeHigh,
+        }
     }
 }

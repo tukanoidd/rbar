@@ -5,11 +5,12 @@ use iced::{Subscription, Task, Theme};
 use iced_layershell::{settings::Settings, to_layer_message, Application};
 use itertools::Itertools;
 use miette::IntoDiagnostic;
+use tokio::sync::Mutex;
 
 use crate::{
     config::Config,
     module::{
-        audio::{Audio, AudioInfo},
+        audio::{Audio, AudioEvent, AudioInfo},
         battery::{Battery, BatteryEvent, BatteryInfo},
         clock::{Clock, ClockEvent},
         ModuleEvent, ModuleGetSet, ModuleGroups,
@@ -37,7 +38,7 @@ struct App {
     module_groups: ModuleGroups,
 
     battery_info: Option<Arc<BatteryInfo>>,
-    audio_info: Option<Arc<AudioInfo>>,
+    audio_info: Option<Arc<Mutex<AudioInfo>>>,
 }
 
 impl App {
@@ -47,7 +48,7 @@ impl App {
             false => None,
         };
         let audio_info = match audio_in_config {
-            true => AudioInfo::init().await.arc().some()?,
+            true => AudioInfo::init().await.tokio_mutex().arc().some()?,
             false => None,
         };
 
@@ -127,12 +128,28 @@ impl Application for App {
                     battery_info,
                     audio_info,
                 }) => {
-                    vec![AppMsg::RefreshBattery(Ok(battery_info))]
+                    let mut msgs = vec![];
+
+                    if let Some(battery_info) = battery_info {
+                        msgs.push(AppMsg::RefreshBattery(Ok(battery_info)));
+                    }
+
+                    if let Some(audio_info) = audio_info {
+                        msgs.push(AppMsg::InitAudio(audio_info));
+                    }
+
+                    msgs
                 }
                 Err(err) => {
                     panic!("Failed to initialize the app: {err}");
                 }
             },
+            AppMsg::InitAudio(info) => {
+                self.audio_info = Some(info.clone());
+                self.module_groups.set_event(AudioEvent::SetData(info));
+
+                vec![]
+            }
 
             AppMsg::WaitAndMsg(duration, msg) => {
                 let msg = Box::into_inner(msg);
@@ -140,7 +157,7 @@ impl Application for App {
             }
             AppMsg::WaitGetBatteryInfo(duration) => {
                 return task_wait_msg!(d duration => {
-                    BatteryInfo::init().arc().some().err_str()
+                    BatteryInfo::init().arc().err_str()
                 }, RefreshBattery)
             }
 
@@ -152,7 +169,7 @@ impl Application for App {
 
             AppMsg::RefreshBattery(info) => match info {
                 Ok(info) => {
-                    self.battery_info = info;
+                    self.battery_info = Some(info);
                     vec![AppMsg::UpdateBattery]
                 }
                 Err(err) => {
@@ -202,7 +219,7 @@ impl Application for App {
 #[derive(Debug, Clone)]
 pub struct AppInit {
     battery_info: Option<Arc<BatteryInfo>>,
-    audio_info: Option<Arc<AudioInfo>>,
+    audio_info: Option<Arc<Mutex<AudioInfo>>>,
 }
 
 impl PartialEq for AppInit {
@@ -212,19 +229,44 @@ impl PartialEq for AppInit {
 }
 
 #[to_layer_message]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum AppMsg {
     Init(Result<AppInit, String>),
+    InitAudio(Arc<Mutex<AudioInfo>>),
 
     UpdateTime,
 
     WaitAndMsg(Duration, Box<AppMsg>),
     WaitGetBatteryInfo(Duration),
 
-    RefreshBattery(Result<Option<Arc<BatteryInfo>>, String>),
+    RefreshBattery(Result<Arc<BatteryInfo>, String>),
     UpdateBattery,
 
     Module(ModuleEvent),
+}
+
+impl PartialEq for AppMsg {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (AppMsg::Init(ai1), AppMsg::Init(ai2)) => ai1 == ai2,
+            (AppMsg::InitAudio(_), AppMsg::InitAudio(_)) => true,
+            (AppMsg::UpdateTime, AppMsg::UpdateTime) => true,
+            (AppMsg::WaitAndMsg(d1, m1), AppMsg::WaitAndMsg(d2, m2)) => d1 == d2 && m1 == m2,
+            (AppMsg::WaitGetBatteryInfo(d1), AppMsg::WaitGetBatteryInfo(d2)) => d1 == d2,
+            (AppMsg::RefreshBattery(bi1), AppMsg::RefreshBattery(bi2)) => bi1 == bi2,
+            (AppMsg::UpdateBattery, AppMsg::UpdateBattery) => true,
+            (AppMsg::Module(me1), AppMsg::Module(me2)) => me1 == me2,
+            (AppMsg::AnchorChange(a1), AppMsg::AnchorChange(a2)) => a1 == a2,
+            (AppMsg::LayerChange(l1), AppMsg::LayerChange(l2)) => l1 == l2,
+            (AppMsg::MarginChange(m1), AppMsg::MarginChange(m2)) => m1 == m2,
+            (AppMsg::SizeChange(s1), AppMsg::SizeChange(s2)) => s1 == s2,
+            (
+                AppMsg::VirtualKeyboardPressed { time: t1, key: k1 },
+                AppMsg::VirtualKeyboardPressed { time: t2, key: k2 },
+            ) => t1 == t2 && k1 == k2,
+            _ => false,
+        }
+    }
 }
 
 impl<T> From<T> for AppMsg
