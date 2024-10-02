@@ -23,10 +23,19 @@ iced_layershell_macros = { version = "0.7", git = "https://github.com/waycrate/e
 iced_renderer = "0.13"
 iced_fonts = { version = "0.1.1", features = ["full"] }
 
-tokio = { version = "1.39.2", features = ["fs", "io-util", "net", "rt-multi-thread", "time"] }
+tokio = { version = "1.39.2", features = [
+  "fs",
+  "io-util",
+  "net",
+  "rt-multi-thread",
+  "time",
+] }
+iced_aw = "0.11.0"
+async-trait = "0.1.83"
 
 directories = "5.0.1"
 blight = "0.7.1"
+pulseaudio = "0.2.1"
 icu_calendar = "1.5.2"
 starship-battery = "0.8.3"
 system-tray = "0.2.0"
@@ -36,6 +45,7 @@ zbus = "4.4.0"
 
 serde = { version = "1.0.206", features = ["derive"] }
 ron = "0.8.1"
+csscolorparser = { version = "0.7.0", features = ["serde", "named-colors"] }
 
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
@@ -47,5 +57,4 @@ itertools = "0.13.0"
 miette = { version = "7.2.0", features = ["fancy", "syntect-highlighter"] }
 paste = "1.0.15"
 bon = "2.3.0"
-pulseaudio = "0.2.1"
-iced_aw = "0.11.0"
+uuid = { version = "1.10.0", features = ["serde", "v4"] }
