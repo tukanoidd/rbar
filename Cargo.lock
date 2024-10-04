@@ -2048,8 +2048,9 @@ dependencies = [
 
 [[package]]
 name = "iced_layershell"
-version = "0.7.2"
-source = "git+https://github.com/waycrate/exwlshelleventloop.git#75451292ee4171a5dde6982704da2ebe2f7aaf95"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3466b5a6c9c5991dafac7077d3af115dd25b950dcc8071831e164f6eb819864d"
 dependencies = [
  "futures",
  "iced",
@@ -2068,8 +2069,9 @@ dependencies = [
 
 [[package]]
 name = "iced_layershell_macros"
-version = "0.7.2"
-source = "git+https://github.com/waycrate/exwlshelleventloop.git#75451292ee4171a5dde6982704da2ebe2f7aaf95"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83f0d978fad7cd91bfc8caae4db5e6babecccbf71652c7dda2e97a8b3b5ae8de"
 dependencies = [
  "darling",
  "manyhow",
@@ -2404,8 +2406,9 @@ dependencies = [
 
 [[package]]
 name = "layershellev"
-version = "0.7.2"
-source = "git+https://github.com/waycrate/exwlshelleventloop.git#75451292ee4171a5dde6982704da2ebe2f7aaf95"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "554d7710662fbf7fcba0522191085a94a8a939a2f34006a1148008467e9f9aed"
 dependencies = [
  "bitflags 2.6.0",
  "log",
@@ -4423,9 +4426,9 @@ dependencies = [
 
 [[package]]
 name = "tempfile"
-version = "3.12.0"
+version = "3.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04cbcdd0c794ebb0d4cf35e88edd2f7d2c4c3e9a5a6dab322839b321c6a87a64"
+checksum = "f0f2c9fc62d0beef6951ccffd757e241266a2c833136efbe35af6cd2567dca5b"
 dependencies = [
  "cfg-if",
  "fastrand 2.1.1",
@@ -4944,8 +4947,9 @@ dependencies = [
 
 [[package]]
 name = "waycrate_xkbkeycode"
-version = "0.7.2"
-source = "git+https://github.com/waycrate/exwlshelleventloop.git#75451292ee4171a5dde6982704da2ebe2f7aaf95"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75f08b315898104c7e1fc734fb3e89e531598589645cd8accaf19b7ad71975a1"
 dependencies = [
  "bitflags 2.6.0",
  "log",

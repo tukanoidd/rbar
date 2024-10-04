@@ -2,12 +2,11 @@ use std::{io::Write, path::PathBuf};
 
 use directories::ProjectDirs;
 use iced_layershell::{reexport::Anchor, settings::LayerShellSettings};
-use itertools::Itertools;
 use miette::IntoDiagnostic;
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
-use crate::module::{clock::ClockFormat, ModuleConfig};
+use crate::module::new::{clock::ClockFormat, ModulesConfig};
 
 #[derive(SmartDefault, Serialize, Deserialize)]
 #[serde(default)]
@@ -17,10 +16,7 @@ pub struct Config {
     #[default((900, 50))]
     pub size: (u32, u32),
 
-    pub left: Vec<ModuleConfig>,
-    #[default(vec![ModuleConfig::Clock(Default::default())])]
-    pub center: Vec<ModuleConfig>,
-    pub right: Vec<ModuleConfig>,
+    pub modules: ModulesConfig,
 }
 
 impl Config {
@@ -43,19 +39,6 @@ impl Config {
                 let config: Config =
                     ron::from_str(&std::fs::read_to_string(path).into_diagnostic()?)
                         .into_diagnostic()?;
-
-                let duplicates = config
-                    .left
-                    .iter()
-                    .chain(config.center.iter())
-                    .chain(config.right.iter())
-                    .duplicates()
-                    .map(ToString::to_string)
-                    .collect_vec();
-
-                if !duplicates.is_empty() {
-                    return Err(miette::miette!("rbar doesn't support more than one instance of a module running (for now), please remove the duplicates: [{}]", duplicates.join(", ")))              ;
-                }
 
                 Ok(config)
             }

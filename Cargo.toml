@@ -4,6 +4,16 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Vitalii Lukyanov <tukanoid@outlook.com>"]
 
+[dependencies.iced_layershell]
+version = "0.8"
+# git = "https://github.com/waycrate/exwlshelleventloop.git"
+# path = "../exwlshelleventloop/iced_layershell"
+
+[dependencies.iced_layershell_macros]
+version = "0.8"
+# git = "https://github.com/waycrate/exwlshelleventloop.git"
+features = ["diagnostics"]
+
 [dependencies]
 clap = { version = "4.5.15", features = ["derive"] }
 
@@ -15,11 +25,6 @@ iced = { version = "0.13", features = [
   "highlighter",
   "advanced",
 ] }
-iced_layershell = { version = "0.7", git = "https://github.com/waycrate/exwlshelleventloop.git" }
-iced_layershell_macros = { version = "0.7", git = "https://github.com/waycrate/exwlshelleventloop.git", features = [
-  "diagnostics",
-] }
-# iced_layershell = { version = "0.7", path = "../exwlshelleventloop/iced_layershell" }
 iced_renderer = "0.13"
 iced_fonts = { version = "0.1.1", features = ["full"] }
 
