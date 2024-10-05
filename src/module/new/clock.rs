@@ -53,7 +53,7 @@ crate::module!(Clock {
             Event: { SwitchFormat, SetTime(DateTime<Local>) },
         },
         methods: {
-            view: {
+            view [style]: {
                 button(text(time.format(format.chrono_format()).to_string()))
                 .on_press(Self::Event::SwitchFormat)
                 .into()

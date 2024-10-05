@@ -7,7 +7,7 @@ use smart_default::SmartDefault;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use crate::app::AppMsg;
+use crate::{app::AppMsg, util::color_css_to_iced};
 
 #[derive(Debug)]
 pub struct RegistryModuleInfo<M>
@@ -16,7 +16,17 @@ where
 {
     module: M,
     info: GenericModuleInfo,
-    widgets: HashMap<Uuid, <M::Widget as ModuleWidget<M>>::State>,
+    widgets: HashMap<Uuid, RegistryModuleWidgetInfo<M>>,
+}
+
+#[derive(Debug)]
+pub struct RegistryModuleWidgetInfo<M>
+where
+    M: Module,
+{
+    state: Arc<Mutex<<M::Widget as ModuleWidget<M>>::State>>,
+    #[allow(clippy::type_complexity)]
+    style: Option<Arc<<<M::Widget as ModuleWidget<M>>::Config as ModuleWidgetConfig>::Style>>,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -66,7 +76,47 @@ pub struct ModuleWidgetGroupConfig {
 }
 
 #[derive(Debug, SmartDefault, Serialize, Deserialize)]
-pub struct ModuleWidgetGroupStyle {}
+pub struct ModuleWidgetGroupStyle {
+    #[default(5.0)]
+    padding: f32,
+    #[default(5.0)]
+    spacing: f32,
+    border: Option<BorderStyle>,
+    background_color: Option<csscolorparser::Color>,
+}
+
+#[derive(Debug, SmartDefault, Serialize, Deserialize)]
+pub struct BorderStyle {
+    width: Option<f32>,
+    color: Option<csscolorparser::Color>,
+    radius: Option<f32>,
+}
+
+impl<'a> From<&'a BorderStyle> for iced::Border {
+    fn from(
+        BorderStyle {
+            width,
+            color,
+            radius,
+        }: &'a BorderStyle,
+    ) -> Self {
+        let mut border = iced::Border::default();
+
+        if let Some(width) = width {
+            border = border.width(*width);
+        }
+
+        if let Some(color) = color {
+            border = border.color(color_css_to_iced(color));
+        }
+
+        if let Some(radius) = radius {
+            border.rounded(*radius);
+        }
+
+        border
+    }
+}
 
 #[derive(Debug)]
 struct ModuleWidgetsLayout {
@@ -103,7 +153,7 @@ pub trait Module: std::fmt::Debug + Sized {
 
     fn widget_state(
         &self,
-        config: StyledModuleWidgetConfig<<Self::Widget as ModuleWidget<Self>>::Config>,
+        config: <Self::Widget as ModuleWidget<Self>>::Config,
     ) -> <Self::Widget as ModuleWidget<Self>>::State;
 }
 
@@ -119,10 +169,14 @@ where
     type Event: ModuleWidgetEvent;
     type State: ModuleWidgetState;
 
-    fn view(self, state: &Self::State) -> Element<'_, Self::Event, Theme, Renderer>;
+    fn view<'a>(
+        self,
+        style: Option<Arc<<Self::Config as ModuleWidgetConfig>::Style>>,
+        state: Arc<Mutex<Self::State>>,
+    ) -> Element<'a, Self::Event, Theme, Renderer>;
     fn update(
         self,
-        state: &mut Self::State,
+        state: Arc<Mutex<Self::State>>,
         event: Self::Event,
     ) -> Option<ModuleWidgetUpdateOutput<M>>;
 }
@@ -244,16 +298,28 @@ macro_rules! modules {
                                         inds: Vec<usize>,
                                         widgets: &'a mut Vec<ModuleWidgetConfigTy>,
                                         ids: &'a mut Vec<Uuid>
-                                ) -> Vec<(Uuid, [< $name WidgetState >])> {
+                                ) -> Vec<(Uuid, RegistryModuleWidgetInfo<$name>)> {
                                         inds
                                             .into_iter()
                                             .map(|ind| widgets.remove(ind))
                                             .filter_map(move |c| match c {
-                                                ModuleWidgetConfigTy::$name(c) => {
+                                                ModuleWidgetConfigTy::$name(StyledModuleWidgetConfig {
+                                                    config,
+                                                    style
+                                                }) => {
                                                     let id = Uuid::new_v4();
                                                     ids.push(id);
 
-                                                    Some((id, module.widget_state(c)))
+                                                    let state = Arc::new(Mutex::new(module.widget_state(config)));
+                                                    let style = style.map(Arc::new);
+
+                                                    Some((
+                                                        id,
+                                                        RegistryModuleWidgetInfo {
+                                                            state,
+                                                            style
+                                                        }
+                                                    ))
                                                 },
                                                 _ => None
                                             }).collect()
@@ -324,6 +390,100 @@ macro_rules! modules {
 
                     tasks
                 }
+
+                pub fn view<'a>(s: Arc<Mutex<Self>>) -> Element<'a, AppMsg, Theme, Renderer> {
+                    let s = s.blocking_lock();
+                    let ModuleWidgetsLayout {
+                        left,
+                        center,
+                        right
+                    } = &s.widgets_layout;
+                    $(let [< $name:snake:lower >] = &s.[< $name:snake:lower >];)*
+
+                    use iced::{*, widget::*};
+
+                    let mut module_groups_row = row![]
+                        .align_y(alignment::Vertical::Center);
+
+                    let widgets = |row: &StyledModuleWidgetRow, align_x: alignment::Horizontal| match row.widget_ids.is_empty() {
+                        true => {
+                            let StyledModuleWidgetRow {
+                                widget_ids,
+                                style: ModuleWidgetGroupStyle {
+                                    padding,
+                                    spacing,
+                                    border,
+                                    background_color
+                                },
+                            } = row;
+                            let mut row_widgets = row![]
+                                .padding(*padding)
+                                .spacing(*spacing)
+                                .align_y(alignment::Vertical::Center)
+                                .width(Length::Shrink);
+
+                            let style = {
+                                let mut style = container::Style::default();
+
+                                if let Some(border) = border {
+                                    style = style.border(border);
+                                }
+
+                                if let Some(bg_color) = background_color {
+                                    style = style.background(color_css_to_iced(bg_color));
+                                }
+
+                                style
+                            };
+
+                            for widget_id in widget_ids {
+                                $(if let Some(RegistryModuleInfo {
+                                    widgets,
+                                    ..
+                                }) = [< $name:snake:lower >] {
+                                    if let Some(RegistryModuleWidgetInfo {
+                                        state,
+                                        style
+                                    }) = widgets.get(widget_id) {
+                                        row_widgets = row_widgets.push(
+                                            [< $name Widget >]
+                                                .view(style.clone(), state.clone())
+                                                .map(ModuleRegistryEvent::widget)
+                                                .map(AppMsg::ModuleRegistry)
+                                        );
+                                    }
+                                })*
+                            }
+
+                            Some(
+                                container(row_widgets)
+                                    .style(move |_| style)
+                                    .width(Length::Fill)
+                                    .align_y(alignment::Vertical::Center)
+                                    .align_x(align_x)
+                            )
+                        },
+                        false => None,
+                    };
+
+                    let left_widgets = widgets(left, alignment::Horizontal::Left);
+                    let center_widgets = widgets(center, alignment::Horizontal::Center);
+                    let right_widgets = widgets(right, alignment::Horizontal::Right);
+
+                    if let Some(left_widgets) = left_widgets {
+                        module_groups_row = module_groups_row.push(left_widgets);
+                    }
+
+                    if let Some(center_widgets) = center_widgets {
+                        module_groups_row = module_groups_row.push(center_widgets);
+                    }
+
+                    if let Some(right_widgets) = right_widgets {
+                        module_groups_row = module_groups_row.push(right_widgets);
+                    }
+
+                    module_groups_row.into()
+                }
             }
 
             #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -356,10 +516,6 @@ macro_rules! modules {
 
 impl ModuleRegistry {
     pub async fn event(&mut self, event: ModuleRegistryEvent) -> miette::Result<AppMsg> {
-        todo!()
-    }
-
-    pub fn view<'a>(s: Arc<Mutex<Self>>) -> Element<'a, AppMsg, Theme, Renderer> {
         todo!()
     }
 }
@@ -472,7 +628,7 @@ macro_rules! module {
                 $(,)?
             },
             methods: {
-                view: $widget_view_block:block,
+                view [$style:ident]: $widget_view_block:block,
                 update [$widget_update_event:ident]: $widget_update_block:block
                 $(,)?
             }
@@ -526,12 +682,9 @@ macro_rules! module {
 
                 fn widget_state(
                     &self,
-                    $crate::module::new::StyledModuleWidgetConfig {
-                        config: [< $name WidgetConfig >] {
-                            $($widget_config_field),*
-                        },
-                        style
-                    }: $crate::module::new::StyledModuleWidgetConfig<[< $name WidgetConfig >]>
+                    [< $name WidgetConfig >] {
+                        $($widget_config_field),*
+                    }: [< $name WidgetConfig >]
                 ) -> <Self::Widget as $crate::module::new::ModuleWidget<Self>>::State {
                     let Self { $($field),* } = self;
                     $module_widget_state_block
@@ -586,18 +739,25 @@ macro_rules! module {
                 type Event = [< $name WidgetEvent >];
                 type State = [< $name WidgetState >];
 
-                fn view(
+                fn view<'a>(
                     self,
-                    Self::State { $($widget_field),*}: &Self::State
-                ) -> iced::Element<'_, Self::Event, iced::Theme, iced::Renderer> {
+                    $style: Option<std::sync::Arc<[< $name WidgetStyle >]>>,
+                    state: std::sync::Arc<tokio::sync::Mutex<Self::State>>
+                ) -> iced::Element<'a, Self::Event, iced::Theme, iced::Renderer> {
+                    use std::ops::Deref;
+                    let lock_state = state.blocking_lock();
+                    let Self::State { $($widget_field),* } = lock_state.deref();
                     $widget_view_block
                 }
 
                 fn update(
                     self,
-                    Self::State { $($widget_field),* }: &mut Self::State,
+                    state: std::sync::Arc<tokio::sync::Mutex<Self::State>>,
                     $widget_update_event: Self::Event
                 ) -> Option<$crate::module::new::ModuleWidgetUpdateOutput<$name>> {
+                    use std::ops::DerefMut;
+                    let mut lock_state = state.blocking_lock();
+                    let Self::State { $($widget_field),* } = lock_state.deref_mut();
                     $widget_update_block
                 }
             }

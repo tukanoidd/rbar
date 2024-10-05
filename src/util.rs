@@ -28,3 +28,12 @@ impl<T, E> ResultExt<T, E> for Result<T, E> {
         self.map_err(|e| e.to_string())
     }
 }
+
+pub fn color_css_to_iced(color: &csscolorparser::Color) -> iced::Color {
+    iced::Color {
+        r: color.r,
+        g: color.g,
+        b: color.b,
+        a: color.a,
+    }
+}
