@@ -137,7 +137,6 @@ pub trait Module: std::fmt::Debug + Sized {
     type InitOutput;
     type CycleInput;
     type Event: ModuleEvent;
-
     type Widget: ModuleWidget<Self>;
 
     fn new(config: Self::Config) -> miette::Result<Self>
@@ -158,6 +157,8 @@ pub trait Module: std::fmt::Debug + Sized {
 }
 
 pub trait ModuleConfig: std::fmt::Debug + Default + Serialize + for<'de> Deserialize<'de> {}
+
+impl ModuleConfig for () {}
 
 pub trait ModuleEvent: std::fmt::Debug + Clone {}
 
@@ -182,8 +183,16 @@ where
 }
 
 pub trait ModuleWidgetStyle: std::fmt::Debug + Serialize + for<'de> Deserialize<'de> {}
+
+impl ModuleWidgetStyle for () {}
+
 pub trait ModuleWidgetEvent: std::fmt::Debug + Clone {}
+
+impl ModuleWidgetEvent for () {}
+
 pub trait ModuleWidgetState: std::fmt::Debug {}
+
+impl ModuleWidgetState for () {}
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct StyledModuleWidgetConfig<C>
@@ -200,6 +209,10 @@ pub trait ModuleWidgetConfig:
     std::fmt::Debug + Default + Serialize + for<'de> Deserialize<'de>
 {
     type Style: ModuleWidgetStyle;
+}
+
+impl ModuleWidgetConfig for () {
+    type Style = ();
 }
 
 pub enum ModuleWidgetUpdateOutput<M>
@@ -493,7 +506,7 @@ macro_rules! modules {
 
             #[derive(Default, Serialize, Deserialize)]
             pub struct ModuleConfigCollection {
-                $([< $name:snake:lower >]: GenericModuleConfig<[< $name Config >]>),+
+                $([< $name:snake:lower >]: GenericModuleConfig<<$name as Module>::Config>),+
             }
 
             #[derive(Debug, derive_more::From, Clone)]
@@ -540,258 +553,3 @@ modules![Clock {
     update_msg: UpdateTime,
     after_init_msg: []
 }];
-
-#[macro_export]
-macro_rules! module {
-    (path) => {$crate::module::new};
-    ($name:ident {
-        module: {
-            fields: {
-                $($field:ident: $field_ty:ty),*
-                $(,)?
-            },
-            types: {
-                Config: {
-                    $(
-                        $(#[default = $config_field_default:expr])?
-                        $config_field:ident: $config_field_ty:ty
-                    ),*
-                    $(,)?
-                },
-                InitInput: {
-                    $($init_input_field:ident: $init_input_field_ty:ty),*
-                    $(,)?
-                },
-                InitOutput: {
-                    $($init_output_field:ident: $init_output_field_ty:ty),*
-                    $(,)?
-                },
-                CycleInput: {
-                    $($cycle_input_field:ident: $cycle_input_field_ty:ty),*
-                    $(,)?
-                },
-                Event: {
-                    $(
-                        $event_variant:ident
-                        $({
-                            $($event_variant_field:ident: $event_variant_field_ty:ty),+
-                        })?
-                        $(($event_single_variant_ty:ty))?
-                    ),*
-                    $(,)?
-                },
-                $(,)?
-            },
-            methods: {
-                new: $module_new_block:block,
-                init: $module_init_block:block,
-                cycle [$cycle_event:ident]: $module_cycle_block:block,
-                widget_state: $module_widget_state_block:block
-                $(,)?
-            }
-            $(,)?
-        },
-        widget: {
-            fields: {
-                $($widget_field:ident: $widget_field_ty:ty),*
-                $(,)?
-            },
-            types: {
-                Config: {
-                    types: {
-                        Style: {
-                            $($style_field:ident: $style_field_ty:ty),*
-                            $(,)?
-                        }
-                        $(,)?
-                    },
-                    fields: {
-                        $(
-                            $(#[default = $widget_config_field_default:expr])?
-                            $widget_config_field:ident: $widget_config_field_ty:ty
-                        ),*
-                        $(,)?
-                    }
-                    $(,)?
-                },
-                Event: {
-                    $(
-                        $widget_event_variant:ident
-                        $({
-                            $($widget_event_variant_field:ident: $widget_event_variant_field_ty:ty),+
-                            $(,)?
-                        })?
-                        $(($widget_event_variant_single_field_ty:ty))?
-                    ),*
-                    $(,)?
-                }
-                $(,)?
-            },
-            methods: {
-                view [$style:ident]: $widget_view_block:block,
-                update [$widget_update_event:ident]: $widget_update_block:block
-                $(,)?
-            }
-            $(,)?
-        }
-        $(,)?
-    }) => {
-        paste::paste! {
-            #[derive(Debug)]
-            pub struct $name {
-                $($field: $field_ty),*
-            }
-
-            impl $crate::module::new::Module for $name {
-                type Config = [< $name Config >];
-                type InitInput = [< $name InitInput >];
-                type InitOutput = [< $name InitOutput >];
-                type CycleInput = [< $name CycleInput >];
-                type Event = [< $name Event >];
-
-                type Widget = [< $name Widget >];
-
-                fn new(Self::Config { $($config_field),* }: Self::Config) -> miette::Result<Self>
-                where
-                    Self: Sized
-                {
-                    Ok($module_new_block)
-                }
-
-                async fn init(
-                    &mut self,
-                    Self::InitInput {
-                        $($init_input_field),*
-                    }: Self::InitInput
-                ) -> miette::Result<Self::InitOutput> {
-                    let Self { $($field),* } = self;
-                    Ok($module_init_block)
-                }
-
-                async fn cycle(
-                    &mut self,
-                    registry: &mut $crate::module::new::ModuleRegistry,
-                    Self::CycleInput {
-                        $($cycle_input_field),*
-                    }: Self::CycleInput,
-                    $cycle_event: Self::Event
-                ) -> miette::Result<Option<$crate::app::AppMsg>> {
-                    let Self { $($field),* } = self;
-                    Ok($module_cycle_block)
-                }
-
-                fn widget_state(
-                    &self,
-                    [< $name WidgetConfig >] {
-                        $($widget_config_field),*
-                    }: [< $name WidgetConfig >]
-                ) -> <Self::Widget as $crate::module::new::ModuleWidget<Self>>::State {
-                    let Self { $($field),* } = self;
-                    $module_widget_state_block
-                }
-            }
-
-            #[derive(Debug, smart_default::SmartDefault, serde::Serialize, serde::Deserialize)]
-            pub struct [< $name Config >] {
-                $(
-                    $(#[default = $config_field_default])?
-                    $config_field: $config_field_ty
-                ),*
-            }
-
-            impl $crate::module::new::ModuleConfig for [< $name Config >] {}
-
-            pub struct [< $name InitInput >] {
-                $($init_input_field: $init_input_field_ty),*
-            }
-
-            pub struct [< $name InitOutput >] {
-                $($init_output_field: $init_output_field_ty),*
-            }
-
-            pub struct [< $name CycleInput >] {
-                $($cycle_input_field: $cycle_input_field_ty),*
-            }
-
-            #[derive(Debug, Clone)]
-            pub enum [< $name Event >] {
-                $(
-                    $event_variant
-                    $({ $($event_variant_field: $event_variant_field_ty),* })?
-                    $(($event_single_variant_ty))?
-                ),*
-            }
-
-            impl $crate::module::new::ModuleEvent for [< $name Event >] {}
-
-            #[derive(Debug)]
-            pub struct [< $name Widget >];
-
-            #[derive(Debug)]
-            pub struct [< $name WidgetState >] {
-                $($widget_field: $widget_field_ty),*
-            }
-
-            impl $crate::module::new::ModuleWidgetState for [< $name WidgetState >] {}
-
-            impl $crate::module::new::ModuleWidget<$name> for [< $name Widget >] {
-                type Config = [< $name WidgetConfig >];
-                type Event = [< $name WidgetEvent >];
-                type State = [< $name WidgetState >];
-
-                fn view<'a>(
-                    self,
-                    $style: Option<std::sync::Arc<[< $name WidgetStyle >]>>,
-                    state: std::sync::Arc<tokio::sync::Mutex<Self::State>>
-                ) -> iced::Element<'a, Self::Event, iced::Theme, iced::Renderer> {
-                    use std::ops::Deref;
-                    let lock_state = state.blocking_lock();
-                    let Self::State { $($widget_field),* } = lock_state.deref();
-                    $widget_view_block
-                }
-
-                fn update(
-                    self,
-                    state: std::sync::Arc<tokio::sync::Mutex<Self::State>>,
-                    $widget_update_event: Self::Event
-                ) -> Option<$crate::module::new::ModuleWidgetUpdateOutput<$name>> {
-                    use std::ops::DerefMut;
-                    let mut lock_state = state.blocking_lock();
-                    let Self::State { $($widget_field),* } = lock_state.deref_mut();
-                    $widget_update_block
-                }
-            }
-
-            #[derive(Debug, smart_default::SmartDefault, serde::Serialize, serde::Deserialize)]
-            pub struct [< $name WidgetConfig >] {
-                $(
-                    $(#[default = $widget_config_field_default])?
-                    $widget_config_field: $widget_config_field_ty
-                ),*
-            }
-
-            impl $crate::module::new::ModuleWidgetConfig for [< $name WidgetConfig >] {
-                type Style = [< $name WidgetStyle >];
-            }
-
-            #[derive(Debug, Serialize, Deserialize)]
-            pub struct [< $name WidgetStyle >] {
-                $($style_field: $style_field_ty),*
-            }
-
-            impl $crate::module::new::ModuleWidgetStyle for [< $name WidgetStyle >] {}
-
-            #[derive(Debug, Clone)]
-            pub enum [< $name WidgetEvent >] {
-                $($widget_event_variant
-                    $({
-                        $($widget_event_variant_field: $widget_event_variant_field_ty),+
-                    })?
-                    $(($widget_event_variant_single_field_ty))?
-                ),*
-            }
-
-            impl $crate::module::new::ModuleWidgetEvent for [< $name WidgetEvent >] {}
-        }
-    };
-}

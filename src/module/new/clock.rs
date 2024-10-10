@@ -1,78 +1,77 @@
 use chrono::{DateTime, Local};
 use derive_more::derive::Display;
 use iced::widget::{button, text};
+use macros::{module_widget, Module};
 use serde::{Deserialize, Serialize};
 
 use crate::app::AppMsg;
 
 use super::ModuleRegistryEvent;
 
-crate::module!(Clock {
-    module: {
-        fields: { time: chrono::DateTime<chrono::Local> },
-        types: {
-            Config: {},
-            InitInput: {},
-            InitOutput: {},
-            CycleInput: {},
-            Event: { UpdateTime },
-        },
-        methods: {
-            new: { Self { time: Local::now() } },
-            init: { ClockInitOutput {} },
-            cycle [event]: {
-                #[allow(unreachable_patterns)]
-                match event {
-                    ClockEvent::UpdateTime => {
-                        *time = chrono::Local::now();
-                        Some(AppMsg::module_registry(
-                            ModuleRegistryEvent::widget(ClockWidgetEvent::SetTime(*time))
-                        ))
-                    },
-                    _ => None
-                }
-            },
-            widget_state: { ClockWidgetState {
-                format,
-                time: *time
-            } },
-        },
-    },
-    widget: {
-        fields: {
-            format: ClockFormat,
-            time: DateTime<Local>
-        },
-        types: {
-            Config: {
-                types: {
-                    Style: {},
+#[derive(Debug, Module)]
+#[module(
+    widget = "ClockWidget", 
+    type_fields(event(name = UpdateTime)),
+    methods(
+        new = "Self { time: Local::now() }",
+        init = "()",
+        cycle = "{
+            #[allow(unreachable_patterns)]
+            match event {
+                ClockEvent::UpdateTime => {
+                    self.time = chrono::Local::now();
+                    Some(AppMsg::module_registry(
+                        ModuleRegistryEvent::widget(ClockWidgetEvent::SetTime(self.time))
+                    ))
                 },
-                fields: { format: ClockFormat },
-            },
-            Event: { SwitchFormat, SetTime(DateTime<Local>) },
-        },
-        methods: {
-            view [style]: {
-                button(text(time.format(format.chrono_format()).to_string()))
+                _ => None
+            }
+        }",
+        widget_state = "ClockWidgetState {
+            format: config.format,
+            time: self.time
+        }"
+    )
+)]
+pub struct Clock {
+    time: chrono::DateTime<chrono::Local>,
+}
+
+#[module_widget(
+    module = Clock,
+    type_fields(
+        config(name = format, ty = "ClockFormat"),
+
+        event(name = SwitchFormat),
+        event(name = SetTime, field(name = time, ty = "DateTime<Local>"))
+    ),
+    methods(
+        view = "
+            button(text(
+                state.time.format(state.format.chrono_format()).to_string()
+            ))
                 .on_press(Self::Event::SwitchFormat)
                 .into()
-            },
-            update [event]: {
-                match event {
-                    ClockWidgetEvent::SwitchFormat => {
-                        format.switch();
-                    },
-                    ClockWidgetEvent::SetTime(new_time) => {
-                        *time = new_time;
-                    },
-                }
+        ",
+        update = "{
+            match event {
+                ClockWidgetEvent::SwitchFormat => {
+                    state.format.switch();
+                },
+                ClockWidgetEvent::SetTime(new_time) => {
+                    state.time = new_time;
+                },
+            }
 
-                None
-            },
-        },
-    }
-});
+            None
+        }"
+    )
+)]
+#[derive(Debug)]
+pub struct ClockWidget {
+    format: ClockFormat,
+    time: DateTime<Local>,
+}
 
 #[allow(non_camel_case_types)]
 #[derive(Default, Display, Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

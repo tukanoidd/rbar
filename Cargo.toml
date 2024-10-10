@@ -1,8 +1,16 @@
+[workspace]
+members = ["macros"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+authors = ["Vitalii Lukyanov <tukanoid@outlook.com>"]
+
 [package]
 name = "rbar"
 version = "0.1.0"
-edition = "2021"
-authors = ["Vitalii Lukyanov <tukanoid@outlook.com>"]
+edition.workspace = true
+authors.workspace = true
 
 [dependencies.iced_layershell]
 version = "0.8"
@@ -15,6 +23,8 @@ version = "0.8"
 features = ["diagnostics"]
 
 [dependencies]
+macros = { path = "macros" }
+
 clap = { version = "4.5.15", features = ["derive"] }
 
 iced = { version = "0.13", features = [
