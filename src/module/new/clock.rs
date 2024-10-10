@@ -13,9 +13,9 @@ use super::ModuleRegistryEvent;
     widget = "ClockWidget", 
     type_fields(event(name = UpdateTime)),
     methods(
-        new = "Self { time: Local::now() }",
-        init = "()",
-        cycle = "{
+        new = [Self { time: Local::now() }],
+        init = [()],
+        cycle = [{
             #[allow(unreachable_patterns)]
             match event {
                 ClockEvent::UpdateTime => {
@@ -26,11 +26,11 @@ use super::ModuleRegistryEvent;
                 },
                 _ => None
             }
-        }",
-        widget_state = "ClockWidgetState {
+        }],
+        widget_state = [ClockWidgetState {
             format: config.format,
             time: self.time
-        }"
+        }]
     )
 )]
 pub struct Clock {
@@ -46,14 +46,14 @@ pub struct Clock {
         event(name = SetTime, field(name = time, ty = "DateTime<Local>"))
     ),
     methods(
-        view = "
+        view = [
             button(text(
                 state.time.format(state.format.chrono_format()).to_string()
             ))
                 .on_press(Self::Event::SwitchFormat)
                 .into()
-        ",
-        update = "{
+        ],
+        update = [{
             match event {
                 ClockWidgetEvent::SwitchFormat => {
                     state.format.switch();
@@ -64,7 +64,7 @@ pub struct Clock {
             }
 
             None
-        }"
+        }]
     )
 )]
 #[derive(Debug)]

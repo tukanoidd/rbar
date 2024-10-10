@@ -6,7 +6,15 @@ use darling::{
 use manyhow::manyhow;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::{parse_quote, DeriveInput, Expr, Field, Generics, Ident, Path, Type, Visibility};
+use syn::{
+    parse_quote, DeriveInput, Expr, ExprArray, Field, Generics, Ident, Path, Type, Visibility,
+};
+
+macro_rules! combine_expr_arrays {
+    ($($arr:ident),+) => {
+        $(let $arr = combine_expr_array(&$arr);)+
+    };
+}
 
 #[manyhow]
 #[proc_macro_derive(Module, attributes(module))]
@@ -36,6 +44,8 @@ pub fn module(input: TokenStream) -> manyhow::Result<TokenStream> {
                 widget_state,
             },
     } = ModuleStruct::from_derive_input(&derive_input)?;
+
+    combine_expr_arrays![new, init, cycle, widget_state];
 
     let (impl_gen, ty_gen, where_gen) = generics.split_for_impl();
 
@@ -279,6 +289,14 @@ fn event_info(
     (path, ty)
 }
 
+fn combine_expr_array(arr: &ExprArray) -> TokenStream {
+    let exprs = arr.elems.iter();
+
+    quote! {
+        #(#exprs);*
+    }
+}
+
 #[derive(FromDeriveInput)]
 #[darling(attributes(module), forward_attrs, supports(struct_any))]
 struct ModuleStruct {
@@ -326,10 +344,10 @@ struct EventVariant {
 
 #[derive(FromMeta)]
 struct ModuleMethods {
-    new: Expr,
-    init: Expr,
-    cycle: Expr,
-    widget_state: Expr,
+    new: ExprArray,
+    init: ExprArray,
+    cycle: ExprArray,
+    widget_state: ExprArray,
 }
 
 #[manyhow]
@@ -349,6 +367,7 @@ pub fn module_widget(attr: TokenStream, input: TokenStream) -> manyhow::Result<T
         type_fields,
         methods: ModuleWidgetMethods { view, update },
     } = ModuleWidgetAttr::from_list(&attr_args)?;
+    combine_expr_arrays![view, update];
 
     let derive_input: DeriveInput = syn::parse2(input)?;
     let ModuleWidget {
@@ -493,8 +512,8 @@ struct ModuleWidgetTypeFields {
 
 #[derive(FromMeta)]
 struct ModuleWidgetMethods {
-    view: Expr,
-    update: Expr,
+    view: ExprArray,
+    update: ExprArray,
 }
 
 #[derive(FromDeriveInput)]
