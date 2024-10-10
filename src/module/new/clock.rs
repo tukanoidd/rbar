@@ -15,7 +15,7 @@ use super::ModuleRegistryEvent;
     methods(
         new = [Self { time: Local::now() }],
         init = [()],
-        cycle = [{
+        cycle = [
             #[allow(unreachable_patterns)]
             match event {
                 ClockEvent::UpdateTime => {
@@ -26,7 +26,7 @@ use super::ModuleRegistryEvent;
                 },
                 _ => None
             }
-        }],
+        ],
         widget_state = [ClockWidgetState {
             format: config.format,
             time: self.time
@@ -53,7 +53,7 @@ pub struct Clock {
                 .on_press(Self::Event::SwitchFormat)
                 .into()
         ],
-        update = [{
+        update = [
             match event {
                 ClockWidgetEvent::SwitchFormat => {
                     state.format.switch();
@@ -61,10 +61,9 @@ pub struct Clock {
                 ClockWidgetEvent::SetTime(new_time) => {
                     state.time = new_time;
                 },
-            }
-
+            }, 
             None
-        }]
+        ]
     )
 )]
 #[derive(Debug)]
