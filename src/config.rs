@@ -1,80 +1,146 @@
-use std::{io::Write, path::PathBuf};
+use std::path::Path;
 
-use directories::ProjectDirs;
-use iced_layershell::{reexport::Anchor, settings::LayerShellSettings};
-use miette::IntoDiagnostic;
-use serde::{Deserialize, Serialize};
+use derive_more::From;
+use iced_layershell::reexport::Anchor;
+use miette::Diagnostic;
+use nickel_lang_core::{eval::cache::lazy::CBNCache, program::Program};
+use serde::Deserialize;
 use smart_default::SmartDefault;
+use thiserror::Error;
 
-use crate::module::new::{clock::ClockFormat, ModulesConfig};
+use crate::{
+    app::module::{clock::ClockSettings, ModuleContainersInfo},
+    util::color::ColorWrap,
+};
 
-#[derive(SmartDefault, Serialize, Deserialize)]
+#[derive(SmartDefault, Deserialize)]
 #[serde(default)]
 pub struct Config {
-    #[default = true]
-    pub top: bool,
-    #[default((900, 50))]
-    pub size: (u32, u32),
-
-    pub modules: ModulesConfig,
+    pub main: MainContainerSettings,
+    pub containers: ModuleContainersSettings,
 }
 
 impl Config {
-    pub fn open(project_dirs: &ProjectDirs, path: Option<PathBuf>) -> miette::Result<Self> {
-        let config_dir = project_dirs.config_dir();
-        let path = match path {
-            Some(path) => path,
-            None => {
-                if !config_dir.exists() {
-                    tracing::warn!("Config dir {config_dir:?} doesn't exist, creating...");
-                    std::fs::create_dir_all(config_dir).into_diagnostic()?;
-                }
+    pub fn open_or_default(config_dir: impl AsRef<Path>) -> Result<Self, ConfigError> {
+        let config_dir = config_dir.as_ref();
+        tracing::debug!("Opening config inside: {config_dir:?}");
 
-                config_dir.join("config.ron")
-            }
-        };
+        if !config_dir.exists() {
+            tracing::debug!("Config dir {config_dir:?} doesn't exist, creating...");
+            std::fs::create_dir_all(config_dir)?;
+        }
 
-        match path.exists() {
+        let config_path = config_dir.join("config.ncl");
+
+        match config_path.exists() {
             true => {
-                let config: Config =
-                    ron::from_str(&std::fs::read_to_string(path).into_diagnostic()?)
-                        .into_diagnostic()?;
+                tracing::trace!("Evaluating config at {config_path:?}");
+
+                let mut program =
+                    Program::<CBNCache>::new_from_file(config_path, std::io::stdout())?;
+
+                let deser_res = program
+                    .eval_full()
+                    .map_err(|e| format!("{e:?}"))
+                    .map_err(ConfigError::Nickel)?;
+
+                tracing::trace!("Config evaluated, converting to JSON...");
+                let deser_json = serde_json::to_string(&deser_res)?;
+
+                tracing::trace!("Conversion to JSON complete, deserializing into a Rust type...");
+                let config = serde_json::from_str(&deser_json)?;
+                tracing::trace!("Deserialization complete!");
 
                 Ok(config)
             }
             false => {
-                tracing::warn!("Config file {path:?} doesn't exist, creating default...");
-
-                let config = Config::default();
-                let config_str = ron::to_string(&config).into_diagnostic()?;
-
-                let mut file = std::fs::File::create(path).into_diagnostic()?;
-                file.write_all(config_str.as_bytes()).into_diagnostic()?;
-
-                Ok(config)
+                tracing::warn!("Config doesn't exist, using default fallback option...");
+                Ok(Self::default())
             }
-        }
-    }
-
-    pub fn layer_shell_settings(&self) -> LayerShellSettings {
-        let Self { top, size, .. } = self;
-
-        LayerShellSettings {
-            anchor: (match top {
-                true => Anchor::Top,
-                false => Anchor::Bottom,
-            }) | Anchor::Left
-                | Anchor::Right,
-            layer: iced_layershell::reexport::Layer::Top,
-            exclusive_zone: size.1 as i32,
-            size: Some(*size),
-            keyboard_interactivity: iced_layershell::reexport::KeyboardInteractivity::None,
-            ..Default::default()
         }
     }
 }
 
-#[derive(SmartDefault, Debug, Serialize, Deserialize)]
-pub struct ClockConfig {
-    pub format: ClockFormat,
+#[derive(SmartDefault, Deserialize)]
+#[serde(default)]
+pub struct MainContainerSettings {
+    #[default = 50]
+    pub height: u32,
+    #[default = 50]
+    pub width: u32,
+
+    #[default = 5]
+    pub padding: u16,
+
+    pub side: Side,
+}
+
+#[derive(Default, Clone, Copy, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Side {
+    Left,
+    Right,
+    #[default]
+    Top,
+    Bottom,
+}
+
+impl From<Side> for Anchor {
+    fn from(value: Side) -> Self {
+        match value {
+            Side::Left => Anchor::Left | Anchor::Top | Anchor::Bottom,
+            Side::Right => Anchor::Right | Anchor::Top | Anchor::Bottom,
+            Side::Top => Anchor::Top | Anchor::Right | Anchor::Left,
+            Side::Bottom => Anchor::Bottom | Anchor::Right | Anchor::Left,
+        }
+    }
+}
+
+pub type ModuleContainersSettings = ModuleContainersInfo<ModuleContainerSettings>;
+
+#[derive(SmartDefault, Deserialize)]
+#[serde(default)]
+pub struct ModuleContainerSettings {
+    pub modules: Vec<ModuleSettings>,
+
+    #[default = 5]
+    pub padding: u16,
+    pub background_color: Option<ColorWrap>,
+}
+
+macro_rules! default_serde_getters {
+    ($($name:ident: $ty:ty = $val:expr),+ $(,)?) => {
+        paste::paste! {
+            $(fn [< default_ $name >]() -> $ty { $val }),+
+        }
+    };
+}
+
+#[derive(Deserialize)]
+pub struct ModuleSettings {
+    #[serde(default = "ModuleSettings::default_padding")]
+    pub padding: u16,
+    #[serde(flatten)]
+    pub ty: ModuleTypeSettings,
+}
+
+impl ModuleSettings {
+    default_serde_getters![padding: u16 = 5];
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type", rename_all = "kebab-case")]
+pub enum ModuleTypeSettings {
+    Clock(ClockSettings),
+}
+
+#[derive(Debug, Error, Diagnostic)]
+pub enum ConfigError {
+    #[error("[Config] [std::io] {0}")]
+    IO(#[from] std::io::Error),
+
+    #[error("[Config] [nickel_lang_core] {0}")]
+    Nickel(String),
+    #[error("[Config] [serde_json] {0}")]
+    Json(#[from] serde_json::Error),
 }

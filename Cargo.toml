@@ -1,5 +1,5 @@
 [workspace]
-members = ["macros"]
+members = []
 resolver = "2"
 
 [workspace.package]
@@ -12,64 +12,40 @@ version = "0.1.0"
 edition.workspace = true
 authors.workspace = true
 
-[dependencies.iced_layershell]
-version = "0.8"
-# git = "https://github.com/waycrate/exwlshelleventloop.git"
-# path = "../exwlshelleventloop/iced_layershell"
-
-[dependencies.iced_layershell_macros]
-version = "0.8"
-# git = "https://github.com/waycrate/exwlshelleventloop.git"
-features = ["diagnostics"]
-
 [dependencies]
-macros = { path = "macros" }
-
-clap = { version = "4.5.15", features = ["derive"] }
-
-iced = { version = "0.13", features = [
-  "fira-sans",
-  "system",
-  "lazy",
-  "tokio",
-  "highlighter",
-  "advanced",
-] }
-iced_renderer = "0.13"
-iced_fonts = { version = "0.1.1", features = ["full"] }
-
-tokio = { version = "1.39.2", features = [
-  "fs",
-  "io-util",
-  "net",
-  "rt-multi-thread",
-  "time",
-] }
+iced = { version = "0.13.1", features = ["advanced", "tokio", "wgpu"] }
+iced_layershell = "0.13.2"
 iced_aw = "0.11.0"
-async-trait = "0.1.83"
+
+smithay-client-toolkit = "0.19.2"
+
+tokio = { version = "1.43.0", features = ["rt-multi-thread"] }
+
+clap = { version = "4.5.28", features = ["derive"] }
 
 directories = "5.0.1"
-blight = "0.7.1"
-pulseaudio = "0.2.1"
-icu_calendar = "1.5.2"
-starship-battery = "0.8.3"
-system-tray = "0.2.0"
-sysinfo = "0.30.13"
-chrono = "0.4.38"
-zbus = "4.4.0"
+chrono = "0.4.39"
+uuid = { version = "1.13.1", features = ["v4"] }
+itertools = "0.14.0"
 
-serde = { version = "1.0.206", features = ["derive"] }
-ron = "0.8.1"
-csscolorparser = { version = "0.7.0", features = ["serde", "named-colors"] }
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.138"
+nickel-lang-core = { version = "0.10.0", default-features = false }
 
-tracing = "0.1.40"
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+
+miette = { version = "7.5.0", features = ["fancy", "syntect-highlighter"] }
+thiserror = "2.0.11"
 
 smart-default = "0.7.1"
-derive_more = { version = "1.0.0", features = ["display", "from"] }
-itertools = "0.13.0"
+derive_more = { version = "1.0.0", features = [
+  "debug",
+  "deref",
+  "deref_mut",
+  "from",
+  "into",
+] }
 
-miette = { version = "7.2.0", features = ["fancy", "syntect-highlighter"] }
 paste = "1.0.15"
-bon = "2.3.0"
-uuid = { version = "1.10.0", features = ["serde", "v4"] }
+pipewire = { version = "0.8.0", features = ["v0_3_77"] }

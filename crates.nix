@@ -16,15 +16,21 @@
       crates = {
         ${crateName} = {
           export = true;
-          runtimeLibs = with pkgs; [
+          runtimeLibs = with pkgs;
+          with xorg; [
             wayland
             vulkan-loader
+            libX11
           ];
-          depsDrvConfig = {
+
+          drvConfig = {
             mkDerivation = {
               nativeBuildInputs = with pkgs; [
                 pkg-config
+
                 libxkbcommon
+                glib.dev
+                pipewire.dev
               ];
             };
           };
